@@ -1,0 +1,51 @@
+<tal metal:define-macro="main" tal:omit-tag=""><!doctype html>
+<html>
+<head>
+    <script src="https://ajax.googleapis.com/ajax/libs/jquery/1.12.4/jquery.min.js"></script>
+    <script src="/static/socket.io.slim.js"></script>
+    <style>
+        #graph {
+            max-height: 96vh;
+            overflow-y:auto}
+        #maintable {height:96vh;}
+        #view {height:40vh;}
+        #cli {height:10vh}
+        #cli textarea {width:90%; height:100%}
+        #cli-submit {float:right}
+    </style>
+</head>
+<body>
+<table width="100%" border="0" id="maintable">
+    <tr valign="top">
+        <td rowspan="2"><div id="graph">graph</div></td>
+        <td id="view"  width="25%">view</td>
+    </tr>
+    <tr valign="top">
+        <td id="action" xrowspan="2">action</td>
+    </tr>
+<!--?    <tr valign="top">-->
+<!--?        <td id="cli">-->
+<!--?            <button id="cli-submit">foo</button>-->
+<!--?            <textarea>cypher</textarea></td>-->
+<!--?    </tr>-->
+</table>
+<script>
+    var socketio = io.connect('http://' + document.domain + ':' + location.port);
+
+    function emit(msg) {
+        socketio.emit('gee',msg);
+    }
+
+    emit({'event':'init'});
+
+    socketio.on('gee', function (msg) {
+        if (msg['event']=='display') {
+            $('#'+msg['section']).html(msg.html)
+        }
+    })
+
+
+</script>
+</body>
+</html>
+</tal>

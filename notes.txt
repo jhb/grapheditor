@@ -1,0 +1,41 @@
+graphviewer
+    nodes:
+        clientside
+            leftclicked
+            startdrag
+            stopdrag
+            hover
+
+        serverside
+            add
+            remove
+            move
+
+    relation:
+        clientside
+            leftclicked
+            hover
+
+        serverside
+            add
+            remove
+
+    general
+        save view
+
+editor / viewer
+    clientside
+        submit
+        close
+        submit/close
+
+            CLI
+                ADD ..... return
+                DEL ..... return
+                SHOW ..... return (default)
+                (Add/Del from visible graph)
+
+    serverside
+        display
+        clear
+

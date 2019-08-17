@@ -1,0 +1,32 @@
+
+    <ul metal:define-macro="nodelist">
+        <li tal:repeat='node nodes' >
+            <span tal:replace="node.id"></span>
+            <a href="" tal:attributes="href '/node/%s' % node.id; id node.id" class="nodelink">
+
+                <span tal:replace="node.get('name_de',node.get('name','xxx'))"></span>
+
+            </a>
+            (<span tal:replace="':'.join(node.labels)"></span>)
+<!--?            <small>-->
+<!--?            <ul>-->
+<!--?                <li tal:repeat='item sorted(node.items())'>-->
+<!--?                    <span tal:replace="item[0]"></span>:-->
+<!--?                    <span tal:replace="item[1]"></span>-->
+<!--?                </li>-->
+
+<!--?            </ul>-->
+<!--?            </small>-->
+        </li>
+
+    </ul>
+
+    <script>
+        $('.nodelink').on('click', function(e) {
+            e.preventDefault();
+            var nid = parseInt($(this).attr('id'));
+            emit({event:'node clicked', nid:nid});
+            console.log(nodeid);
+        })
+        console.log('nodelist');
+    </script>

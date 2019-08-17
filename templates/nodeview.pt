@@ -1,0 +1,16 @@
+<span tal:replace="node.id"></span> <span tal:replace="':'.join(node.labels)"></span>
+<ul>
+    <li tal:repeat='item sorted(node.items())'>
+        <span tal:replace="item[0]"></span>:
+        <span tal:replace="item[1]"></span>
+    </li>
+</ul>
+
+<div><a href="" class="nodeedit" id="${node.id}">Edit</a></div>
+    <script>
+        $('.nodeedit').on('click', function(e) {
+            e.preventDefault();
+            var nid = parseInt($(this).attr('id'));
+            emit({event:'node edit', nid:nid});
+        })
+    </script>

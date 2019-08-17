@@ -1,0 +1,22 @@
+<b>Edit node ${node.id}</b>
+
+        <div tal:define='field form.labels'>
+            ${field.label}<br>
+            ${field}
+
+        </div>
+
+        <div tal:repeat='field [f for f in form._fields.values() if not (f.id.startswith("new_") or f.id.startswith("labels"))]'>${field.label}
+            <br>
+            ${field}
+            <a href="" tal:attributes='href "?delete=%s" % field.id'
+             onclick="return confirm('Are you sure you want to remove the property?')">[x]</a>
+            <br>&nbsp;
+        </div>
+
+        <div>---- Add a new property ----<br>&nbsp;<br></div>
+         <div tal:repeat='field [f for f in form._fields.values() if f.id.startswith("new_")]'>${field.label}<br/>${field}</div>
+
+
+        <input type="submit">
+
