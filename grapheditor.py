@@ -193,12 +193,16 @@ def shownodeform(msg):
            'html': node(nid)}
     return msg
 
+def nodecommit(msg):
+    nid =int(msg['nid'])
+
 def emit(msg):
     socketio.emit('gee', msg, callback=messageReceived)
 
 eventroutes = {'init':[shownodelist],
                'node clicked':[shownodeview],
-               'node edit': [shownodeform]}
+               'node edit': [shownodeform],
+               'node commit': [nodecommit]}
 
 if __name__ == '__main__':
     print('x' * 30)

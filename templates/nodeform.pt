@@ -1,5 +1,7 @@
 <b>Edit node ${node.id}</b>
 
+    <form id="nodeform">
+        <input name="nid" value="${node.id}" type="hidden">
         <div tal:define='field form.labels'>
             ${field.label}<br>
             ${field}
@@ -19,4 +21,4 @@
 
 
         <input type="submit">
-
+    </form>
