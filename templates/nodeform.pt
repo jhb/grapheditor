@@ -11,7 +11,7 @@
         <div tal:repeat='field [f for f in form._fields.values() if not (f.id.startswith("new_") or f.id.startswith("labels"))]'>${field.label}
             <br>
             ${field}
-            <a href="" tal:attributes='href "?delete=%s" % field.id'
+            <a href="" tal:attributes='href "?delete=%s&nid=%s" % (field.id,node.id)'
              onclick="return confirm('Are you sure you want to remove the property?')">[x]</a>
             <br>&nbsp;
         </div>
@@ -22,3 +22,17 @@
 
         <input type="submit">
     </form>
+
+        <script>
+        $('#nodeform').on('submit', function(e) {
+            e.preventDefault();
+            var data = {};
+            var serialized = $(this).serializeArray();
+            for (let o of  serialized) {
+                data[o['name']]=o['value'];
+            }
+            emit({event:'node submit', formdata:data});
+            console.log(data);
+        })
+        console.log('nodeform');
+    </script>

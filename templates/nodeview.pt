@@ -13,4 +13,5 @@
             var nid = parseInt($(this).attr('id'));
             emit({event:'node edit', nid:nid});
         })
+        console.log('nodeview');
     </script>

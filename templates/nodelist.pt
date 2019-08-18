@@ -26,7 +26,7 @@
             e.preventDefault();
             var nid = parseInt($(this).attr('id'));
             emit({event:'node clicked', nid:nid});
-            console.log(nodeid);
+            console.log(nid);
         })
         console.log('nodelist');
     </script>

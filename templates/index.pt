@@ -8,7 +8,7 @@
             max-height: 96vh;
             overflow-y:auto}
         #maintable {height:96vh;}
-        #view {height:40vh;}
+        #view {height:30vh;}
     </style>
 </head>
 <body>
@@ -23,14 +23,22 @@
 </table>
 <script>
     var socketio = io.connect('http://' + document.domain + ':' + location.port);
+    var occupied = {};
 
     function emit(msg) {
+        msg['occupied']=occupied;
         socketio.emit('gee',msg);
     }
 
     socketio.on('gee', function (msg) {
+
         if (msg['event']=='display') {
+            occupied[msg['section']]=msg['occ'];
             $('#'+msg['section']).html(msg.html)
+        } else if (msg['event']=='clear') {
+            console.log('clear')
+            delete(occupied[msg['section']]);
+            $('#'+msg['section']).html('');
         }
     })
         emit({'event':'init'});
