@@ -8,17 +8,21 @@
             max-height: 96vh;
             overflow-y:auto}
         #maintable {height:96vh;}
-        #view {height:30vh;}
+        #view { height:30vh;
+                max-height:30vh;
+                overflow-y: auto}
+        #action {height:66vh;
+                padding-top: 10px;}
     </style>
 </head>
 <body>
-<table width="100%" border="0" id="maintable">
+<table width="100%" border="1" id="maintable">
     <tr valign="top">
         <td rowspan="2"><div id="graph">graph</div></td>
-        <td id="view"  width="25%">view</td>
+        <td width="25%"><div id="view">view</div></td>
     </tr>
     <tr valign="top">
-        <td id="action" xrowspan="2">action</td>
+        <td xrowspan="2"><div id="action">action</div></td>
     </tr>
 </table>
 <script>

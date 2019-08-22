@@ -40,7 +40,10 @@ class TemplateWrapper:
 
 def getTemplate(name):
     templates = PageTemplateLoader('templates', '.pt')
-    return TemplateWrapper(templates[name], flask=flask, templates=templates)
+    return TemplateWrapper(templates[name],
+                           flask=flask,
+                           templates=templates,
+                           displayName=displayName)
 
 
 def getNodes():
@@ -48,6 +51,12 @@ def getNodes():
         result = session.run('match (n) return n order by id(n)')
         return [row['n'] for row in result]
 
+def displayName(node):
+    names = ['name_de','name','shortname']
+    for name in names:
+        if name in node:
+            return node[name]
+    return 'xxx'
 
 @api.route('/nodelist')
 def nodelist():
@@ -91,8 +100,7 @@ def updateNode(node, items):
             statement+=', '
         statement += "n:%s" % itemsd['labels']
     print(statement)
-    with driver.session() as session:
-        result = session.run(statement)
+    run(statement)
     return statement
 
 
@@ -101,6 +109,27 @@ def delNodeProperty(nid, propertyname):
     with driver.session() as session:
         result = session.run(statement)
 
+def run(statement,**kwargs):
+    with driver.session() as session:
+        result = session.run(statement,**kwargs)
+        return result
+
+def getRelations(nid,filter=None):
+    incoming = []
+    outgoing = []
+    print('getRels')
+    if filter is None or filter is 'out':
+        statement = "MATCH (n)-[r]->(m) WHERE id(n)={nid} RETURN r,m LIMIT 20"
+        result = run(statement,nid=nid)
+        for row in result:
+            outgoing.append((row['r'],row['m']))
+    if filter is None or filter is 'in':
+        statement = "MATCH (n)<-[r]-(m) WHERE id(n)={nid} RETURN r,m LIMIT 20"
+        result = run(statement, nid=nid)
+        for row in result:
+            incoming.append((row['r'],row['m']))
+    out = (outgoing,incoming)
+    return out
 
 @api.route('/node/<nid>', methods=['GET', 'POST'])
 def node(nid=7,req=None):
@@ -163,7 +192,7 @@ def messageReceived(methods=['GET', 'POST']):
 def handle_node_clicked(json,methods=['GET','POST']):
     print('node clicked',json)
 
-def newnode(nid=7,formdata=None):
+def nodeform(nid=7, formdata=None):
     node = getNode(int(nid))
     if 'delete' in request.args:
         delNodeProperty(nid, request.args['delete'])
@@ -224,10 +253,13 @@ def shownodelist(msg):
 def shownodeview(msg):
     print('show node view')
     nid = int(msg['nid'])
+    outgoing,incoming = getRelations(nid)
     msg = {'event':   'display',
            'section': 'view',
            'occ': nid,
-           'html':    getTemplate('nodeview')(node=getNode(nid))}
+           'html':    getTemplate('nodeview')(node=getNode(nid),
+                                              outgoing=outgoing,
+                                              incoming=incoming)}
     return msg
 
 def shownodeform(msg,nid=None):
@@ -236,12 +268,12 @@ def shownodeform(msg,nid=None):
     msg = {'event': 'display',
            'section': 'action',
            'occ': nid,
-           'html': newnode(nid)}
+           'html': nodeform(nid)}
     return msg
 
 def nodesubmit(msg):
     nid = int(msg['formdata']['nid'])
-    newnode(nid,MultiDict(msg['formdata'].items()))
+    nodeform(nid, MultiDict(msg['formdata'].items()))
     out=[shownodeform(msg,nid)]
     # newmsg = {'event':   'clear',
     #        'section': 'action'};

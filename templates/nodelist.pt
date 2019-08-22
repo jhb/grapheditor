@@ -4,7 +4,7 @@
             <span tal:replace="node.id"></span>
             <a href="" tal:attributes="href '/node/%s' % node.id; id node.id" class="nodelink">
 
-                <span tal:replace="node.get('name_de',node.get('name','xxx'))"></span>
+                <span tal:replace="displayName(node)"></span>
 
             </a>
             (<span tal:replace="':'.join(node.labels)"></span>)

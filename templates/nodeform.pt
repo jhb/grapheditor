@@ -1,5 +1,5 @@
 <b>Edit node ${node.id}</b>
-
+<small>
     <form id="nodeform">
         <input name="nid" value="${node.id}" type="hidden">
         <div tal:define='field form.labels'>
@@ -22,7 +22,7 @@
 
         <input type="submit">
     </form>
-
+</small>
         <script>
         $('#nodeform').on('submit', function(e) {
             e.preventDefault();
