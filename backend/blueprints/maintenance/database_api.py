@@ -4,7 +4,7 @@ from flask_smorest import Blueprint
 
 from blueprints.maintenance import database_model
 from blueprints.maintenance.login_api import require_tab_id
-from database.neo4j_connection import (
+from database.bolt_connection import (
     get_current_datatabase_name,
     set_current_database_name,
 )

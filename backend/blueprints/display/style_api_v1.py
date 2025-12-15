@@ -3,7 +3,7 @@ from flask.views import MethodView
 from flask import abort, current_app, session
 import pyparsing as pp
 
-from database.neo4j_connection import neo4j_connect
+from database.bolt_connection import bolt_connect
 from database.utils import abort_with_json
 from blueprints.display import exceptions, style_model, style_support
 from blueprints.maintenance.login_api import require_tab_id
@@ -58,7 +58,7 @@ class Styles(MethodView):
 
         For each session we store a map of grass filename and the parsed rules.
         """
-        neo4j_connect()
+        bolt_connect()
         if "file" not in files:
             abort_with_json(400, "Missing field containing file")
         grass_file = files["file"]
@@ -83,7 +83,7 @@ class Node(MethodView):
     def delete(self, filename: str):
         """Delete style file by filename"""
         try:
-            neo4j_connect()
+            bolt_connect()
             style_support.delete_stored_style(filename)
             return f"Style {filename} deleted"
         except exceptions.StyleNotFoundException:
@@ -100,7 +100,7 @@ class StyleCurrent(MethodView):
         """
         # Since /api/v1/style doesn't require a connection (see main.py),
         # connect here.
-        neo4j_connect()
+        bolt_connect()
         cur_file = get_selected_style()
         return {"filename": cur_file}
 
@@ -120,7 +120,7 @@ class StyleCurrent(MethodView):
             abort_with_json(
                 400, f"Unknown file: {filename}", always_send_message=True
             )
-        neo4j_connect()
+        bolt_connect()
         select_style(filename)
         return "Style file selected."
 

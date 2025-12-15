@@ -33,6 +33,11 @@ FT_QUERY_MIN_SCORE = 0.1
 FT_SEARCH_MAX_RESULTS = 5000
 
 class CypherDatabase(GraphDatabase):
+
+    @property
+    def specifics(self):
+        return g.conn.specifics
+
     def _run(self, *args, **kwargs):
         return g.conn.run(*args, **kwargs)
 
@@ -58,11 +63,11 @@ class CypherDatabase(GraphDatabase):
             updated_properties.update({'_uuid__tech_': str(uuid4())})
             node_data['properties'] = updated_properties
 
-        query_text = """
+        query_text = f"""
         UNWIND $node_data_list AS node_data
         CALL apoc.create.node(node_data['labels'], node_data['properties'])
         YIELD node AS n
-        RETURN n, elementid(n) as nid
+        RETURN n, {self.specifics.id_func('n')} as nid
         """
         query_result = self._run(query_text, node_data_list=node_data_list)
 
@@ -153,10 +158,10 @@ class CypherDatabase(GraphDatabase):
         """ if property_filters else ""
 
         query_text = f"""MATCH (n)
-        WHERE elementid(n) IN $raw_db_ids
+        WHERE {self.specifics.id_func('n')} IN $raw_db_ids
         {label_filters_expression}
         {property_filter_expr}
-        RETURN n, elementid(n) AS id"""
+        RETURN n, {self.specifics.id_func('n')} AS id"""
 
         current_app.logger.debug(f"QUERY: {query_text}")
 
@@ -270,13 +275,13 @@ class CypherDatabase(GraphDatabase):
             parts["label"] = parts["label"].value
             parts_list.append(parts)
 
-        query_str = """UNWIND $parts_list AS map
+        query_str = f"""UNWIND $parts_list AS map
         WITH map, map['label'] AS label,
              map['name'] AS name,
              map['original_id'] AS original_id
         MATCH (n:MetaRelation__tech_|MetaLabel__tech_|MetaProperty__tech_)
         WHERE n.name__tech_=name AND label in labels(n)
-        RETURN original_id, elementid(n) AS raw_db_id
+        RETURN original_id, {self.specifics.id_func('n')} AS raw_db_id
         """
         current_app.logger.debug(query_str)
         query_result = self._run(query_str, parts_list=parts_list)
@@ -297,7 +302,7 @@ class CypherDatabase(GraphDatabase):
         """Fetch a node by its id from the database.
         Might return None if not found."""
         result = self._run(
-            "MATCH (n) WHERE elementid(n)=$nid RETURN n",
+            f"MATCH (n) WHERE {self.specifics.id_func('n')}=$nid RETURN n",
             nid=nid,
         )
         row = result.single()
@@ -327,7 +332,7 @@ class CypherDatabase(GraphDatabase):
         )
 
         result = self._run(
-            f"""MATCH (n) WHERE elementid(n)=$nid
+            f"""MATCH (n) WHERE {self.specifics.id_func('n')}=$nid
                 SET n=$properties
                 {label_update}
                 RETURN n
@@ -381,7 +386,7 @@ class CypherDatabase(GraphDatabase):
 
         if properties:
             result = self._run(
-                f"""MATCH (n) WHERE elementid(n)=$nid
+                f"""MATCH (n) WHERE {self.specifics.id_func('n')}=$nid
                     SET n=$properties
                     {label_update}
                     RETURN n""",
@@ -391,7 +396,7 @@ class CypherDatabase(GraphDatabase):
 
         else:
             result = self._run(
-                f"""MATCH (n) WHERE elementid(n)=$nid
+                f"""MATCH (n) WHERE {self.specifics.id_func('n')}=$nid
                     {label_update}
                     RETURN n""",
                 nid=raw_db_id,
@@ -410,7 +415,7 @@ class CypherDatabase(GraphDatabase):
             return None
 
         result = self._run(
-            f"""MATCH (n) WHERE elementid(n) IN {raw_db_ids}
+            f"""MATCH (n) WHERE {self.specifics.id_func('n')} IN {raw_db_ids}
             CALL (n) {{ DETACH DELETE n }}
             RETURN COUNT(n) AS c"""
         )
@@ -465,7 +470,7 @@ class CypherDatabase(GraphDatabase):
             where_clauses = exprs.get("where_clauses")
             incoming_res = self._run(
                 f"MATCH (neighbor{neighbor_props})-[r{rel_props}]->(n)"
-                f" WHERE elementid(n)=$nid {where_clauses} "
+                f" WHERE {self.specifics.id_func('n')}=$nid {where_clauses} "
                 "RETURN r, neighbor",
                 nid=raw_db_id,
             )
@@ -484,7 +489,7 @@ class CypherDatabase(GraphDatabase):
             where_clauses = exprs.get("where_clauses")
             outgoing_res = self._run(
                 f"MATCH (n)-[r{rel_props}]->(neighbor{neighbor_props}) "
-                f"WHERE elementid(n)=$nid {where_clauses} "
+                f"WHERE {self.specifics.id_func('n')}=$nid {where_clauses} "
                 "RETURN r, neighbor",
                 nid=raw_db_id,
             )
@@ -608,7 +613,7 @@ class CypherDatabase(GraphDatabase):
         UNWIND $id_pairs AS id_pair
         WITH id_pair[0] AS original_id, id_pair[1] AS raw_db_id
         MATCH ({source_var})-[r]->({target_var})
-        WHERE elementid(m) = raw_db_id
+        WHERE {self.specifics.id_func('m')} = raw_db_id
         {label_filters_expr}
         {property_filter_expr}
         {rel_type_expr}
@@ -623,8 +628,8 @@ class CypherDatabase(GraphDatabase):
         """
         if exclude_relation_types is None:
             exclude_relation_types = []
-        query = ("MATCH (a)-[r]->(b) WHERE elementid(a) in $node_ids AND "
-                 "elementid(b) IN $node_ids")
+        query = (f"MATCH (a)-[r]->(b) WHERE {self.specifics.id_func('a')} in $node_ids AND "
+                 f"{self.specifics.id_func('b')} IN $node_ids")
         if exclude_relation_types:
             query += " AND NOT type(r) in $exclude_relation_types"
         query +=" RETURN r"
@@ -702,9 +707,9 @@ class CypherDatabase(GraphDatabase):
         return result
 
     def incoming_relation_types(self, node_ids):
-        query_text = """
+        query_text = f"""
         MATCH (a)-[r]->(b)
-        WHERE elementid(b) IN $node_ids
+        WHERE {self.specifics.id_func('b')} IN $node_ids
         RETURN type(r) AS rel_type, count(a) AS num_neighbors
         """
         result = self._run(query_text, node_ids=node_ids)
@@ -714,9 +719,9 @@ class CypherDatabase(GraphDatabase):
         }
 
     def outgoing_relation_types(self, node_ids):
-        query_text = """
+        query_text = f"""
         MATCH (a)-[r]->(b)
-        WHERE elementid(a) IN $node_ids
+        WHERE {self.specifics.id_func('a')} IN $node_ids
         RETURN type(r) AS rel_type, count(b) AS num_neighbors
         """
         result = self._run(query_text, node_ids=node_ids)
@@ -737,7 +742,7 @@ class CypherDatabase(GraphDatabase):
                 WHERE (NOT prop STARTS WITH "_")
                       AND ((toLower(toStringOrNull({var_name}[prop])) STARTS WITH toLower($text))
                            OR (toLower(prop) STARTS WITH toLower($text))))
-            OR toLower(elementid({var_name})) CONTAINS toLower($text)))
+            OR toLower({self.specifics.id_func(var_name)}) CONTAINS toLower($text)))
         """
 
     def _query_nodes_with_nft(self, text: str, labels: list[str]) -> dict[str, BaseNode]:
@@ -754,7 +759,7 @@ class CypherDatabase(GraphDatabase):
         text = f"{text.replace(':', r'\:')}"
         if labels_filter_expr:
             query += f"WHERE {labels_filter_expr} "
-        query += "RETURN n, elementid(n) AS nid, score"
+        query += f"RETURN n, {self.specifics.id_func('n')} AS nid, score"
         result = self._run(query, text=text, labels=labels)
         # If we allow any score, some things become confusing to the user. For
         # example searching for an ID returns every node/relation in the graph,
@@ -777,7 +782,7 @@ class CypherDatabase(GraphDatabase):
         if text:
             query += self._property_search_query_str('n')
 
-        query += "RETURN n, elementid(n) AS nid"
+        query += f"RETURN n, {self.specifics.id_func('n')} AS nid"
 
         result = self._run(query, text=text, labels=labels)
         nodes = {
@@ -837,9 +842,9 @@ class CypherDatabase(GraphDatabase):
         id_map = {
             raw_db_id: rid for rid in rids if (raw_db_id := parse_db_id(rid))
         }
-        query = """
+        query = f"""
         UNWIND $ids AS id
-        MATCH ()-[r]->() WHERE elementid(r)=id
+        MATCH ()-[r]->() WHERE {self.specifics.id_func('r')}=id
         RETURN r, id
         """
         res = self._run(query, ids=list(id_map.keys()))
@@ -850,7 +855,7 @@ class CypherDatabase(GraphDatabase):
 
     def _get_relation_by_raw_db_id(self, rid):
         result = self._run(
-            """MATCH ()-[r]->() WHERE elementid(r)=$rid
+            f"""MATCH ()-[r]->() WHERE {self.specifics.id_func('r')}=$rid
                RETURN r""",
             rid=rid,
         )
@@ -860,8 +865,8 @@ class CypherDatabase(GraphDatabase):
         return None
 
     def _update_relation_references(self, old_rid, new_rid):
-        query = """
-        MATCH (n)-[r]->() WHERE elementid(r)=$new_full_rid
+        query = f"""
+        MATCH (n)-[r]->() WHERE {self.specifics.id_func('r')}=$new_full_rid
         MATCH (p)-[pos:pos__tech_]->(n)
         WITH pos.out_relations__tech_ AS old_rels,
              pos,
@@ -919,8 +924,8 @@ class CypherDatabase(GraphDatabase):
         ):
             new_type = relation_data["type"].split(":")[-1]
             result = self._run(
-                """
-                MATCH (n)-[r]->(m) WHERE elementid(r)=$rid
+                f"""
+                MATCH (n)-[r]->(m) WHERE {self.specifics.id_func('r')}=$rid
                 CALL apoc.create.relationship(n, $new_type, $properties, m)
                 YIELD rel AS r2
                 DELETE r
@@ -932,7 +937,7 @@ class CypherDatabase(GraphDatabase):
             )
         else:
             result = self._run(
-                """MATCH ()-[r]->() WHERE elementid(r)=$rid
+                f"""MATCH ()-[r]->() WHERE {self.specifics.id_func('r')}=$rid
                    SET r=$properties
                    RETURN r""",
                 rid=raw_db_id,
@@ -969,11 +974,11 @@ class CypherDatabase(GraphDatabase):
             updated_properties.update({'_uuid__tech_': str(uuid4())})
             relation_data['properties'] = updated_properties
 
-        query_text = """
+        query_text = f"""
         UNWIND $relation_data_list AS rel_data
         MATCH (n),(m)
-        WHERE elementid(n) = rel_data['source_id']
-          AND elementid(m) = rel_data['target_id']
+        WHERE {self.specifics.id_func('n')} = rel_data['source_id']
+          AND {self.specifics.id_func('m')} = rel_data['target_id']
         CALL apoc.create.relationship(
                  n, rel_data['type'], rel_data['properties'], m
              )
@@ -985,7 +990,7 @@ class CypherDatabase(GraphDatabase):
             'Number of created relations (%d) differ from input size (%d).',
             [num_new_rels, num_input_rels]
         )
-        RETURN r, elementid(r) as rid
+        RETURN r, {self.specifics.id_func('r')} as rid
         """
         new_rels = {}
         try:
@@ -1019,7 +1024,7 @@ class CypherDatabase(GraphDatabase):
             return None
 
         result = self._run(
-            f"""MATCH ()-[r]->() WHERE elementid(r) IN {raw_db_ids}
+            f"""MATCH ()-[r]->() WHERE {self.specifics.id_func('r')} IN {raw_db_ids}
                 CALL (r) {{
                   DELETE r
                 }}
@@ -1064,10 +1069,10 @@ class CypherDatabase(GraphDatabase):
             }
             for nid, pos in data.items()
         ]
-        query = """
+        query = f"""
         UNWIND $arr AS pos
-        MATCH (p) WHERE elementid(p) = $pid
-        MATCH (n) WHERE elementid(n) = pos.id
+        MATCH (p) WHERE {self.specifics.id_func('p')} = $pid
+        MATCH (n) WHERE {self.specifics.id_func('n')} = pos.id
         CREATE (p)-[:pos__tech_ {x__tech_: pos.x,
                                  y__tech_: pos.y,
                                  z__tech_: pos.z,
@@ -1085,12 +1090,12 @@ class CypherDatabase(GraphDatabase):
             pid: perspective ID (string).
             data: array of relation IDs.
         """
-        rel_query = """
+        rel_query = f"""
         UNWIND $arr AS rel_id
         MATCH (p)-[pos:pos__tech_]->(n)-[r]->()
         WHERE id(r) = rel_id
               AND r._uuid__tech_ IS NOT NULL
-              AND elementid(p) = $pid
+              AND {self.specifics.id_func('p')} = $pid
         SET pos.out_relations__tech_ = [r._uuid__tech_] + pos.out_relations__tech_
         """
 
@@ -1104,10 +1109,10 @@ class CypherDatabase(GraphDatabase):
         corresponding positions.
         """
 
-        create_query = """CREATE (p: Perspective__tech_)
+        create_query = f"""CREATE (p: Perspective__tech_)
                           SET p.name__tech_ = $name,
                               p.description__tech_ = $description
-                          RETURN elementid(p) as id"""
+                          RETURN {self.specifics.id_func('p')} as id"""
         name = perspective_data.get("name", "")
         description = perspective_data.get("description", "")
         result = self._run(create_query, name=name, description=description)
@@ -1166,12 +1171,12 @@ class CypherDatabase(GraphDatabase):
 
         # in the UNWIND call we add a dummy string to the list (out_relations),
         # so that we still get results even when out_relations is empty.
-        query = """
+        query = f"""
         MATCH (p:Perspective__tech_)-[pos:pos__tech_]->(b)
-        WHERE elementid(p)=$raw_db_id
+        WHERE {self.specifics.id_func('p')}=$raw_db_id
         UNWIND pos.out_relations__tech_ + 'last_element' as rel_uid
         OPTIONAL MATCH ()-[r]->(c) where r._uuid__tech_=rel_uid
-        RETURN p, pos, b, r, rel_uid, elementid(r) AS rel_id
+        RETURN p, pos, b, r, rel_uid, {self.specifics.id_func('r')} AS rel_id
         """
 
         result = self._run(query, raw_db_id=raw_db_id)
@@ -1195,9 +1200,9 @@ class CypherDatabase(GraphDatabase):
         ones.
         """
         raw_db_id = parse_db_id(pid)
-        query = """
+        query = f"""
         MATCH (p)-[pos:pos__tech_]->()
-        WHERE elementid(p) = $raw_db_id
+        WHERE {self.specifics.id_func('p')} = $raw_db_id
         SET p.name__tech_ = $name
         DELETE pos
         """
@@ -1227,10 +1232,10 @@ class CypherDatabase(GraphDatabase):
         return suggestions
 
     def get_paraqueries(self):
-        result = g.conn.run("""
+        result = g.conn.run(f"""
         MATCH (param:Parameter__tech_)-[rel:parameter__tech_]->(pquery:Paraquery__tech_)
-        RETURN elementid(pquery) AS pquery_id, pquery,
-               elementid(param) AS param_id, param,
+        RETURN {self.specifics.id_func}(pquery) AS pquery_id, pquery,
+               {self.specifics.id_func}(param) AS param_id, param,
                rel
         """)
         pquery_dict = dict()
@@ -1305,8 +1310,8 @@ class CypherDatabase(GraphDatabase):
         If nids is set, only labels of node ids in it are returned.
         """
         if nids:
-            query = """
-            MATCH (n) WHERE elementid(n) IN $nids
+            query = f"""
+            MATCH (n) WHERE {self.specifics.id_func('n')} IN $nids
             UNWIND labels(n) AS l
             RETURN DISTINCT l AS label
             """
@@ -1359,8 +1364,8 @@ class CypherDatabase(GraphDatabase):
         """
 
         if nids:
-            query = """
-            MATCH (n) WHERE elementid(n) in $nids
+            query = f"""
+            MATCH (n) WHERE {self.specifics.id_func('n')} in $nids
             UNWIND keys(n) AS key
             RETURN DISTINCT key AS prop
             """

@@ -31,7 +31,7 @@ from blueprints.display.style_api_v1 import blp as style_api
 from blueprints.context_menu_api_v1 import blp as context_menu_api
 
 from database.cypher_database import CypherDatabase
-from database.neo4j_connection import neo4j_connect
+from database.bolt_connection import bolt_connect
 from database.settings import config
 
 from utils import basedir, get_customized_file_dir
@@ -202,7 +202,7 @@ def load_metamodels():
         if "x-tab-id" not in request.headers:
             abort(401)
         current_app.graph_db = CypherDatabase()
-        neo4j_connect()
+        bolt_connect()
         current_app.graph_db.load_metamodels()
 
 
@@ -313,7 +313,7 @@ if __name__ == "__main__":
         run_server()
 
     # https://stackoverflow.com/questions/70396641/how-to-run-gunicorn-inside-python-not-as-a-command-line
-    elif platform.uname().system.lower()=='linux':
+    elif 0 and platform.uname().system.lower()=='linux':
         print("Detected Linux, Preparing gunicorn")
 
         # pylint: disable=import-error

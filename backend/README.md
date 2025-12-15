@@ -33,7 +33,7 @@ flowchart TD
   node_model[node_model.py]
   relation_model[relation_model.py]
   property_model[property_model.py]
-  neo4j[neo4j_connection.py]
+  neo4j[bolt_connection.py]
   settings[settings.py]
   main --> node
   main --> relation
@@ -54,7 +54,7 @@ flowchart TD
 - **relation_api.py** is the blueprint for the relation related REST API
 - **relation_model.py** the schemata describing relation related things
 - **property_model.py** describes the properties that both nodes and relations can have
-- **neo4j_connection.py** contains all the neo4j related logic. Maybe later we want to have other connectors, like memgraph or a mock connector.
+- **bolt_connection.py** contains all the neo4j related logic. Maybe later we want to have other connectors, like memgraph or a mock connector.
 - **settings.py** reads the configuration from the env/.env
 
 

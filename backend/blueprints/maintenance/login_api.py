@@ -6,7 +6,7 @@ from flask_smorest import Blueprint
 import neo4j
 from blueprints.maintenance import headers_model
 from blueprints.maintenance import login_model
-from database.neo4j_connection import Neo4jConnection, neo4j_connect
+from database.bolt_connection import BoltConnection, bolt_connect
 from database.utils import abort_with_json
 
 blp = Blueprint("Login", __name__, description="Authentication functionality")
@@ -45,7 +45,7 @@ class Login(MethodView):
     @require_tab_id()
     def get(self):
         """Get login information for the current tab/session."""
-        neo4j_connect()
+        bolt_connect()
         if hasattr(g, "conn"):
             return {"host": g.conn.host, "username": g.conn.username}
         abort(401)
@@ -67,7 +67,7 @@ class Login(MethodView):
             abort_with_json(401, "Request headers must have a x-tab-id entry")
 
         try:
-            conn = Neo4jConnection(
+            conn = BoltConnection(
                 host=login_data["host"],
                 username=login_data["username"],
                 password=login_data["password"],

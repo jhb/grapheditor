@@ -14,11 +14,11 @@ connections = dict()
 drivers = dict()
 db_versions = dict()
 
+
 # We use abort and abort_with_json to break out from a function, so
 # the inconsistent-return-statements warning is a false positive
 # pylint: disable=inconsistent-return-statements
-
-class Neo4jConnection:
+class BoltConnection:
     """Proxy for Neo4j connection supporting transaction-based operations."""
 
     def __init__(self, *, host, username, password, database=None):
@@ -27,6 +27,15 @@ class Neo4jConnection:
         self.database = database
         self.password = password
         self._driver = self._setup_driver(host, username, password)
+        self.specifics = None
+        name = self.is_valid()
+        if name:
+            name_lower = name.lower()
+            if name_lower.startswith("neo4j"):
+                self.specifics = Neo4jSpecifics(self)
+            elif name_lower.startswith("memgraph"):
+                self.specifics = MemgraphSpecifics(self)
+
 
     def has_ft(self):
         """Return if grapheditor functions/procedures are installed and running.
@@ -75,12 +84,7 @@ class Neo4jConnection:
         return bool(val)
 
     def has_nft_index(self):
-        query_result = self.run("""
-        SHOW FULLTEXT INDEXES YIELD name, state
-        WHERE state = 'ONLINE'
-        RETURN 'nft' IN collect(name)
-        """, _as_admin=True)
-        return query_result.single().value()
+        return self.specifics.has_nft_index()
 
     def has_iga_triggers(self):
         """Return whether IGA triggers are installed.
@@ -96,10 +100,12 @@ class Neo4jConnection:
 
     def is_valid(self):
         """Test if connection of Neo4j database works."""
+
         try:
-            result = self.run("CALL db.ping()").single()
-            if result and result.value():
-                return True
+            result = self.run(
+                "call dbms.components() yield name, versions, edition unwind versions as version return name, version, edition;").single()
+            if result and result[0]:
+                return result[0]
         except neo4j.exceptions.AuthError as e:
             abort_with_json(401, f"AuthError: {e}")
         except (ValueError, neo4j.exceptions.DriverError):
@@ -168,7 +174,6 @@ class Neo4jConnection:
                 self._setup_driver(self.host, self.username, self.password)
         abort_with_json(400, "Max connection retries limit reached")
 
-
     def commit(self):
         """
         Commit the transaction. Shouldn't be called directly.
@@ -227,13 +232,32 @@ class Neo4jConnection:
 
     def get_databases(self):
         """Return all databases available."""
-        query = "SHOW DATABASES"
-        result = [
-            {"name": row["name"], "status": row["currentStatus"]}
-            for row in self.run(query, _as_admin=True)
-            if row["name"] != "system"
-        ]
-        return result
+
+        return self.specifics.get_databases()
+
+    def get_database(self, name):
+        """Return database info."""
+
+        return self.specifics.get_database(name)
+
+    def is_database_available(self, name):
+        """Return if database exists and is online"""
+        db_info = self.get_database(name)
+        if db_info and "status" in db_info:
+            return db_info["status"] == "online"
+        return False
+
+class Specifics:
+
+    def __init__(self, connection):
+        self.connection = connection
+
+
+class Neo4jSpecifics(Specifics):
+
+    def id_func(self, varname):
+        return f"elementid({varname})"
+
 
     def get_database(self, name):
         """Return database info."""
@@ -262,13 +286,37 @@ class Neo4jConnection:
             return {"name": self.database, "status": status}
         return None
 
-    def is_database_available(self, name):
-        """Return if database exists and is online"""
-        db_info = self.get_database(name)
-        if db_info and "status" in db_info:
-            return db_info["status"] == "online"
-        return False
+    def get_databases(self):
+        """Return all databases available."""
+        query = "SHOW DATABASES"
+        result = [
+            {"name": row["name"], "status": row["currentStatus"]}
+            for row in self.run(query, _as_admin=True)
+            if row["name"] != "system"
+        ]
+        return result
 
+    def has_nft_index(self):
+        query_result = self.run("""
+        SHOW FULLTEXT INDEXES YIELD name, state
+        WHERE state = 'ONLINE'
+        RETURN 'nft' IN collect(name)
+        """, _as_admin=True)
+        return query_result.single().value()
+
+class MemgraphSpecifics(Specifics):
+
+    def id_func(self, varname):
+        return f"toString(id({varname}))"
+
+    def get_database(self, name):
+        return dict(name="memgraph",status="online")
+
+    def get_databases(self):
+        return [dict(name="memgraph",status="online")]
+
+    def has_nft_index(self):
+        return False
 
 def hash_connection_data(login_data, db):
     return hash(
@@ -285,7 +333,7 @@ def fetch_connection(login_data, db):
         conn = connections[hash_val]
         current_app.logger.debug("reusing existing connection")
     else:
-        conn = Neo4jConnection(
+        conn = BoltConnection(
             host=login_data["host"],
             username=login_data["username"],
             password=login_data["password"],
@@ -296,7 +344,7 @@ def fetch_connection(login_data, db):
     return conn
 
 
-def neo4j_connect():
+def bolt_connect():
     """Establish connection to the Neo4j server."""
     tab_id = None
     if "x-tab-id" in request.headers:
@@ -311,7 +359,7 @@ def neo4j_connect():
 
 
 def fetch_connection_by_id(tab_id):
-    """Given a tab id, return a corresponding Neo4jConnection instance."""
+    """Given a tab id, return a corresponding BoltConnection instance."""
     if "login_data" not in session or tab_id not in session["login_data"]:
         # we allow reusing connection from a previously used tab ID, so that
         # the user doesn't have to relog on each tab
