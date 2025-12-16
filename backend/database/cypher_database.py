@@ -775,7 +775,7 @@ class CypherDatabase(GraphDatabase):
     def _query_nodes_scan_props(self, text: str, labels: list[str]) -> dict[str, BaseNode]:
 
         if labels:
-            query = "MATCH (n:$any($labels)) "
+            query = f"MATCH (n:{'|'.join(labels)}) " # insecure
         else:
             # the above statement doesn't work if no labels are given. Allow all labels "manually"
             query = "MATCH (n) "
@@ -784,7 +784,7 @@ class CypherDatabase(GraphDatabase):
 
         query += f"RETURN n, {self.specifics.id_func('n')} AS nid"
 
-        result = self._run(query, text=text, labels=labels)
+        result = self._run(query, text=text)
         nodes = {
             row['nid']: BaseNode.from_neo_node(row["n"])
             for row in result
@@ -1073,11 +1073,11 @@ class CypherDatabase(GraphDatabase):
         UNWIND $arr AS pos
         MATCH (p) WHERE {self.specifics.id_func('p')} = $pid
         MATCH (n) WHERE {self.specifics.id_func('n')} = pos.id
-        CREATE (p)-[:pos__tech_ {x__tech_: pos.x,
+        CREATE (p)-[:pos__tech_ {{x__tech_: pos.x,
                                  y__tech_: pos.y,
                                  z__tech_: pos.z,
                                  out_relations__tech_: []
-                                }]->(n);
+                                }}]->(n);
         """
 
         self._run(query, pid=pid, arr=arr)
@@ -1234,8 +1234,8 @@ class CypherDatabase(GraphDatabase):
     def get_paraqueries(self):
         result = g.conn.run(f"""
         MATCH (param:Parameter__tech_)-[rel:parameter__tech_]->(pquery:Paraquery__tech_)
-        RETURN {self.specifics.id_func}(pquery) AS pquery_id, pquery,
-               {self.specifics.id_func}(param) AS param_id, param,
+        RETURN {self.specifics.id_func('pquery')} AS pquery_id, pquery,
+               {self.specifics.id_func('param')} AS param_id, param,
                rel
         """)
         pquery_dict = dict()
