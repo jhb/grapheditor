@@ -86,42 +86,23 @@ def find_db_or_start_testcontainer(request):
         yield connection_url
         return
 
-    neo4j = (
-        Neo4jContainer(
-            image=TEST_NEO4J_IMAGE,
-            port=NEO4J_INTERNAL_PORT,
-            password=NEO4J_PASSWORD,
+    neo4j = Neo4jContainer(
+        image=TEST_NEO4J_IMAGE,
+        port=NEO4J_INTERNAL_PORT,
+        password=NEO4J_PASSWORD,
+    ).with_envs(
+        **dict(
+            NEO4J_ACCEPT_LICENSE_AGREEMENT=NEO4J_ACCEPT_LICENSE_AGREEMENT,
+            NEO4J_dbms_security_procedures_whitelist=NEO4J_DBMS_SECURITY_PROCEDURES_WHITELIST,
+            NEO4J_dbms_security_procedures_unrestricted=NEO4J_DBMS_SECURITY_PROCEDURES_UNRESTRICTED,
+            NEO4J_server_memory_heap_initial__size=NEO4J_SERVER_MEMORY_HEAP_INITIAL_SIZE,
+            NEO4J_server_memory_heap_max__size=NEO4J_SERVER_MEMORY_HEAP_MAX_SIZE,
+            NEO4J_server_memory_pagecache_size=NEO4J_SERVER_MEMORY_PAGECACHE_SIZE,
+            NEO4J_apoc_export_file_enabled=NEO4J_APOC_EXPORT_FILE_ENABLED,
+            NEO4J_apoc_trigger_enabled=NEO4J_APOC_TRIGGER_ENABLED,
+            NEO4J_apoc_trigger_refresh=NEO4J_APOC_TRIGGER_REFRESH,
+            NEO4J_apoc_custom_procedures_refresh=NEO4J_APOC_CUSTOM_PROCEDURES_REFRESH
         )
-        .with_env(
-            "NEO4J_ACCEPT_LICENSE_AGREEMENT", NEO4J_ACCEPT_LICENSE_AGREEMENT
-        )
-        .with_env(
-            "NEO4J_dbms_security_procedures_whitelist",
-            NEO4J_DBMS_SECURITY_PROCEDURES_WHITELIST,
-        )
-        .with_env(
-            "NEO4J_dbms_security_procedures_unrestricted",
-            NEO4J_DBMS_SECURITY_PROCEDURES_UNRESTRICTED,
-        )
-        .with_env(
-            "NEO4J_server_memory_heap_initial__size",
-            NEO4J_SERVER_MEMORY_HEAP_INITIAL_SIZE,
-        )
-        .with_env(
-            "NEO4J_server_memory_heap_max__size",
-            NEO4J_SERVER_MEMORY_HEAP_MAX_SIZE,
-        )
-        .with_env(
-            "NEO4J_server_memory_pagecache_size",
-            NEO4J_SERVER_MEMORY_PAGECACHE_SIZE,
-        )
-        .with_env(
-            "NEO4J_apoc_export_file_enabled", NEO4J_APOC_EXPORT_FILE_ENABLED
-        )
-        .with_env("NEO4J_apoc_trigger_enabled", NEO4J_APOC_TRIGGER_ENABLED)
-        .with_env("NEO4J_apoc_trigger_refresh", NEO4J_APOC_TRIGGER_REFRESH)
-        .with_env("NEO4J_apoc_custom_procedures_refresh",
-                  NEO4J_APOC_CUSTOM_PROCEDURES_REFRESH)
     )
 
     if "pipeline" not in TEST_NEO4J_IMAGE:
