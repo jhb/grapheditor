@@ -247,13 +247,13 @@ class BoltConnection:
             return db_info["status"] == "online"
         return False
 
-class Specifics:
+class Dialect:
 
     def __init__(self, connection):
-        self.connection = connection
+        self.conn = connection
 
 
-class Neo4jDialect(Specifics):
+class Neo4jDialect(Dialect):
 
     def id_func(self, varname):
         return f"elementid({varname})"
@@ -264,12 +264,12 @@ class Neo4jDialect(Specifics):
 
         status = None
         if name:
-            result = self.run(f"SHOW DATABASE `{name}`", _as_admin=True).single()
+            result = self.conn.run(f"SHOW DATABASE `{name}`", _as_admin=True).single()
             if result:
                 self.database = result.get("name", None)
                 status = result.get("currentStatus", "")
         else:
-            self.database = self.run(
+            self.database = self.conn.run(
                 "CALL db.info() YIELD name", _as_admin=True
             ).single().get("name", None)
             # fetching database name and currentStatus in a single operation
@@ -291,20 +291,20 @@ class Neo4jDialect(Specifics):
         query = "SHOW DATABASES"
         result = [
             {"name": row["name"], "status": row["currentStatus"]}
-            for row in self.run(query, _as_admin=True)
+            for row in self.conn.run(query, _as_admin=True)
             if row["name"] != "system"
         ]
         return result
 
     def has_nft_index(self):
-        query_result = self.run("""
+        query_result = self.conn.run("""
         SHOW FULLTEXT INDEXES YIELD name, state
         WHERE state = 'ONLINE'
         RETURN 'nft' IN collect(name)
         """, _as_admin=True)
         return query_result.single().value()
 
-class MemgraphDialect(Specifics):
+class MemgraphDialect(Dialect):
 
     def id_func(self, varname):
         return f"toString(id({varname}))"
