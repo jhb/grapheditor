@@ -27,14 +27,14 @@ class BoltConnection:
         self.database = database
         self.password = password
         self._driver = self._setup_driver(host, username, password)
-        self.specifics = None
+        self.dialect = None
         name = self.is_valid()
         if name:
             name_lower = name.lower()
             if name_lower.startswith("neo4j"):
-                self.specifics = Neo4jSpecifics(self)
+                self.dialect = Neo4jDialect(self)
             elif name_lower.startswith("memgraph"):
-                self.specifics = MemgraphSpecifics(self)
+                self.dialect = MemgraphDialect(self)
 
 
     def has_ft(self):
@@ -84,7 +84,7 @@ class BoltConnection:
         return bool(val)
 
     def has_nft_index(self):
-        return self.specifics.has_nft_index()
+        return self.dialect.has_nft_index()
 
     def has_iga_triggers(self):
         """Return whether IGA triggers are installed.
@@ -115,22 +115,22 @@ class BoltConnection:
     @property
     def _tx(self):
         """We work transaction based"""
-        if not hasattr(g, "neo4j_transaction"):
+        if not hasattr(g, "bolt_transaction"):
             g.neo4j_session = self._driver.session(database=self.database)
-            g.neo4j_transaction = g.neo4j_session.begin_transaction()
-        return g.neo4j_transaction
+            g.bolt_transaction = g.neo4j_session.begin_transaction()
+        return g.bolt_transaction
 
     @property
     def _admin_tx(self):
         """This transaction is NOT comitted"""
-        if not hasattr(g, "neo4j_admin_transaction"):
+        if not hasattr(g, "bolt_admin_transaction"):
             g.neo4j_admin_session = self._driver.session(
                 database=self.database
             )
-            g.neo4j_admin_transaction = (
+            g.bolt_admin_transaction = (
                 g.neo4j_admin_session.begin_transaction()
             )
-        return g.neo4j_admin_transaction
+        return g.bolt_admin_transaction
 
     def run(self, query, _as_admin=False, **params):
         """
@@ -179,7 +179,7 @@ class BoltConnection:
         Commit the transaction. Shouldn't be called directly.
         """
         self._tx.commit()
-        del g.neo4j_transaction
+        del g.bolt_transaction
 
     @staticmethod
     def doom():
@@ -197,23 +197,23 @@ class BoltConnection:
         exceptions were raised, we commit the transaction, otherwise
         we roll it back.
         """
-        if hasattr(g, "neo4j_admin_transaction"):
+        if hasattr(g, "bolt_admin_transaction"):
             current_app.logger.info("Rolling back admin transaction")
-            g.neo4j_admin_transaction.rollback()
-            del g.neo4j_admin_transaction
+            g.bolt_admin_transaction.rollback()
+            del g.bolt_admin_transaction
 
-        if hasattr(g, "neo4j_transaction"):
+        if hasattr(g, "bolt_transaction"):
             if getattr(g, "doom_transaction", False) or exception:
                 current_app.logger.info("rolling back doomed transaction")
-                g.neo4j_transaction.rollback()
+                g.bolt_transaction.rollback()
             else:
                 try:
-                    g.neo4j_transaction.commit()
+                    g.bolt_transaction.commit()
                 # we want to use a rollback on any crash
                 # pylint: disable=broad-exception-caught
                 except Exception:
-                    g.neo4j_transaction.rollback()
-            del g.neo4j_transaction
+                    g.bolt_transaction.rollback()
+            del g.bolt_transaction
 
     def _hash(self):
         return hash((self.host, self.username))
@@ -233,12 +233,12 @@ class BoltConnection:
     def get_databases(self):
         """Return all databases available."""
 
-        return self.specifics.get_databases()
+        return self.dialect.get_databases()
 
     def get_database(self, name):
         """Return database info."""
 
-        return self.specifics.get_database(name)
+        return self.dialect.get_database(name)
 
     def is_database_available(self, name):
         """Return if database exists and is online"""
@@ -253,7 +253,7 @@ class Specifics:
         self.connection = connection
 
 
-class Neo4jSpecifics(Specifics):
+class Neo4jDialect(Specifics):
 
     def id_func(self, varname):
         return f"elementid({varname})"
@@ -304,7 +304,7 @@ class Neo4jSpecifics(Specifics):
         """, _as_admin=True)
         return query_result.single().value()
 
-class MemgraphSpecifics(Specifics):
+class MemgraphDialect(Specifics):
 
     def id_func(self, varname):
         return f"toString(id({varname}))"

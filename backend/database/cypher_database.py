@@ -36,7 +36,7 @@ class CypherDatabase(GraphDatabase):
 
     @property
     def specifics(self):
-        return g.conn.specifics
+        return g.conn.dialect
 
     def _run(self, *args, **kwargs):
         return g.conn.run(*args, **kwargs)
